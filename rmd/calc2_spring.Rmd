@@ -1,0 +1,119 @@
+---
+title: "Class exploration for MA courses"
+author: "Shreejit Poudyal"
+date: "10/4/2021"
+output: html_notebook
+---
+
+### Introduction
+
+This program is being used to predict enrollment for MA 132 (Calculus II) for Spring 2022. The data comes directly from the Mathematics Department provided Prof. Joseph D Skufca.
+
+### Packages 
+
+For the analysis, I used the following packages for data wrangling and visualization.
+
+- **tidyverse** for data wrangling and visualization
+- **janitor** for examining and cleaning untidy data
+- **readxl** for reading data from an excel file locally
+- **here** to specify where files/data is in the computer relative to a particular file
+
+```{r}
+library(tidyverse)
+library(janitor)
+library(readxl)
+library(here)
+```
+
+### Read Data
+
+Using the file from Moodle to import data. The data set can be found in the data file on github.
+`clean_names()` makes sure that the variables names in the data set aren't untidy and filled with weird characters and names.
+
+```{r}
+main_data = read_csv("~/final_portfolio/data/CU_ACAD_DEPT_WHEN_OFF_ENRL_22740.csv", skip=1)  %>%
+  clean_names()
+```
+
+### Filtering
+
+Filtering the data for only Math courses. 
+
+Since we require data for Math courses, we will look at the data that is relevant to only Math courses using `filter()`. We will filter for courses that are named "MA". 
+
+A Discussion (DIS) class is a co-requisite with a Lecture (LEC) class, so we don't need to include them in finding out the final data-set for predicting enrollment in MA 132. Each person taking an LEC class is in one of the DIS classes. We will try to predict enrollment in MA 132 if he/she is enrolled in a LEC class. (According to the data, 2044 different observations are for discussion classes. We know this is true because LEC classes hold more students than that in DIS classes.)
+
+We also want to see if those classes are actively going and have students enrolled, such that there are students who will move from that course to MA 132.
+
+Finally, we also have some restrictions to the courses you can involve in. 
+1. Students must have taken Calculus I in order to move to Calc II.
+2. MA 41 is a co-requisite to MA 131 and cannot be used to fulfill MA 131 credit hours.
+3. Introductory MA courses don't satisfy all the criteria to enroll in MA 132.
+
+```{r}
+MA_data <- main_data %>% 
+  select(course_id:catalog, term_8, tot_enrl, component) %>%
+  rename(session = term_8) %>%
+  filter(subject == "MA", component == "LEC", tot_enrl > 0, catalog %in% c(131, 132)) %>%
+  mutate(course = case_when(catalog == 131 ~ "Calc I",
+                          catalog == 132 ~ "Calc II")) %>%
+  group_by(course, session) %>%
+  summarise(enrl = sum(tot_enrl))
+```
+
+### Term-wise Data
+
+The chunk below groups data by session (Fall and Spring) i.e. it separates the variable session that is in format "session year". When it reads a " " as a separator, the two values are separated ans stores in the respective variable designated in the code i.e. `session` and `year`. It also filters our the data values for Summer session.
+
+```{r}
+term_data = MA_data %>% 
+  separate(session, into = c("session","year"), sep = " ", convert = TRUE) %>%
+  filter(session != "Summer") %>%
+ungroup()
+```
+
+### Academic Years
+
+This part of the code is particularly important because it format the data in such a way that the academic year are shown as continuous academic sessions. Which means Fall 2014 would be 14-15, Spring 2016 would be 15-16 and so on.
+
+```{r}
+acad_year=term_data %>%
+  mutate(year = year-2000) %>%
+  mutate(acad_session=case_when(session == "Fall" ~ str_c(year,"-",year+1),
+                      session == "Spring" ~ str_c(year-1,"-",year)))
+```
+
+### Enrollment Data
+
+`pivot_wider()` "widens" data, increasing the number of columns and decreasing the number of rows.
+
+```{r}
+enrl_data = acad_year %>%
+  pivot_wider(acad_session, names_from = c(course, session), values_from = enrl) %>%
+  clean_names() %>%
+  arrange(acad_session)
+
+```
+
+### Data Visualization
+
+The code below shows us a graph with a possible range of students enrolling for MA 132 (Calculus II) for the spring semester.
+
+```{r}
+enrl_data %>%
+  filter(calc_ii_spring>0) %>%
+  ggplot(mapping=aes(x = calc_i_fall, y = calc_ii_spring)) +
+  geom_point() +
+  geom_smooth(method = lm) +
+  theme_minimal() +
+  labs(
+    x ="Calc I enrollments (Fall)",
+    y ="Calc II enrollments (Spring)",
+    title = "Calc II enrollment prediction"
+  )
+```
+The `ggsave()` code has been used with the `here` package. `ggsave()` ensures that the previous plot created gets saved with the name and device as declared bu the user. In this case, it will save it in the file/folder as instructed by the user. I will be saving all my necessary plots in the output folder.
+
+```{r}
+ggsave(here("output", "calcII_enrollment.jpg"))
+```
