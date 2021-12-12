@@ -2,7 +2,7 @@
 
 This repository contains all the projects I did in DS 241 class.
 
-In this class, we did the following projects:
+In this class, I did the following projects:
 
 1. COVID Data Analysis: In this project we studied the cases and deaths for various states in th US and compared the cumulative cases for selected states.
 2. DS in a Box (Lab 04): This lab is to verify a joke made famous by Mitch Hedberg who said "La Quinta means right next to Denny's". In this lab we explored the validity of this joke and along the way learned some more data wrangling and tips for visualizing spatial data.
